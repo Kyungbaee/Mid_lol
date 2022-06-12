@@ -4,6 +4,10 @@ import plotly.express as px
 import requests
 import time
 from tqdm import tqdm
+import cufflinks as cf
+
+# 그래프가 주피터 노트북에서 표시되지 않는다면 아래 설정을 사용해 주세요.
+cf.go_offline(connected = True)
 
 ## 길어서 안보이는 컬럼 표시
 pd.options.display.max_columns = None
@@ -33,42 +37,64 @@ df_2 = df[["game_id","team","win","dragon_first","dragon_kill"
 dragon_count = 0        ## 첫 용 처치 판수 총합
 blue_dragon_count = 0   ## 블루 진영 첫 용 처치 판수
 red_dragon_count = 0    ## 레드 진영 첫 용 처치 판수
+
 herald_count = 0        ## 첫 전령 처치 판수 총합
 blue_herald_count = 0   ## 블루 진영 첫 전령 처치 판수
 red_herald_count = 0    ## 레드 진영 첫 전령 처치 판수
-dragon_gold_diff = 0
-herald_gold_diff = 0
-except_count = 0
+
+dragon_gold_diff = 0    ## 첫 용 처치팀(승리)과 첫 전령 처치팀(패배) 사용한 골드 차이 
+herald_gold_diff = 0    ## 첫 전령 처치팀(승리)과 첫 용 처치팀(패배) 사용한 골드 차이
+except_count = 0        ## 예외 데이터 카운트
 
 
+## 인덱스 짝수(블루팀), 홀수(레드팀) 2개씩 묶어서 전처리
 for i in range(0,len(df_2)-1,2):
+    
+    ## 블루팀 첫 드래곤 처치, 레드팀 첫 전령 처치한 경우
     if ((df_2.loc[i]["dragon_first"] == True) & (df_2.loc[i+1]["riftHerald_first"] == True)) :
         dragon_count += 1
+        
+        ## 블루팀 첫 드래곤 처치 및 승리
         if(df_2.loc[i]["win"] & df_2.loc[i]["dragon_first"]):
             blue_dragon_count +=1
             dragon_gold_diff += df_2.loc[i+1]["gold_spent"]  / df_2.loc[i]["gold_spent"] * 100
+            
+            ## 예외 데이터 탐색
             if(dragon_gold_diff<0):
                 except_count += 1
                 
+        ## 레드팀 첫 전령 처치 및 승리        
         elif(df_2.loc[i+1]["win"] & df_2.loc[i+1]["riftHerald_first"]):
             red_herald_count += 1
             dragon_gold_diff += df_2.loc[i]["gold_spent"] / df_2.loc[i+1]["gold_spent"]  * 100
+            
+            ## 예외 데이터 탐색
             if(dragon_gold_diff<0):
                 except_count += 1
-            
+                
+    ## 레드팀 첫 드래곤 처치, 블루팀 첫 전령 처치한 경우        
     if ((df_2.loc[i]["riftHerald_first"] == True) & (df_2.loc[i+1]["dragon_first"] == True)):
         herald_count += 1
+        
+        ## 블루팀 첫 전령 처치 및 승리
         if(df_2.loc[i]["win"] & df_2.loc[i]["riftHerald_first"]):
             blue_herald_count += 1
             herald_gold_diff += df_2.loc[i+1]["gold_spent"]  / df_2.loc[i]["gold_spent"] * 100
+            
+            ## 예외 데이터 탐색
             if(herald_gold_diff<0):
                 except_count += 1
+                
+        ## 레드팀 첫 드래곤 처치 및 승리        
         elif(df_2.loc[i+1]["win"] & df_2.loc[i+1]["dragon_first"]):
             red_dragon_count += 1
             herald_gold_diff += df_2.loc[i]["gold_spent"] / df_2.loc[i+1]["gold_spent"]  * 100
+            
+            ## 예외 데이터 탐색
             if(herald_gold_diff<0):
                 except_count += 1
-          
+
+## 시각화에 사용될 데이터, 데이터 프레임 생성
 dragon_blue = round(blue_dragon_count / dragon_count * 100,2)
 herald_red = round(red_herald_count / dragon_count * 100,2)
 gold_diff_1 = round(100-dragon_gold_diff/dragon_count,2)
@@ -81,11 +107,13 @@ data.loc[0] = ["Blue Win Rate",dragon_blue,herald_blue]
 data.loc[1] = ["Red Win Rate",herald_red,dragon_red]
 data.loc[2] = ["Gold Spent Diff",gold_diff_1,gold_diff_2]
 
-
+# 데이터 프레임 plotly.express 시각화 (승률 및 사용한 골드 비교)
+## 첫 용 - 블루 진영 vs  첫 전령 - 레드 진영
 y = [str(data["first_dragon"][0])+"%",str(data["first_dragon"][1])+"%",str(data["first_dragon"][2])+"%"]
-fig = px.bar(data, x="Team Color", y="first_dragon",color="Team Color",text=y,title="Blue - First Dragon, Red - First Herald")
+fig = px.bar(data, x="Team Color", y="first_dragon",color="Team Color",text=y,title="첫 용 - 블루 진영 vs  첫 전령 - 레드 진영")
 fig.show()
 
+## 첫 용 - 레드 진영 vs  첫 전령 - 블루 진영
 y = [str(data["first_herald"][0])+"%",str(data["first_herald"][1])+"%",str(data["first_herald"][2])+"%"]
-fig = px.bar(data, x="Team Color", y="first_herald",color="Team Color", text=y,title="Blue - First Herald, Red - First Dragon")
+fig = px.bar(data, x="Team Color", y="first_herald",color="Team Color", text=y,title="첫 용 - 레드 진영 vs  첫 전령 - 블루 진영")
 fig.show()
